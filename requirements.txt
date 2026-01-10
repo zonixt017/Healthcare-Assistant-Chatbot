@@ -10,3 +10,12 @@ faiss-cpu
 tiktoken
 huggingface-hub
 python-dotenv
+
+streamlit
+streamlit-chat
+langchain
+langchain-community
+sentence-transformers
+pypdf
+faiss-cpu
+python-dotenv
