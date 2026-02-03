@@ -1,3 +1,10 @@
+import os
+
+# Fix for "FileNotFoundError: [WinError 2]" when CUDA_PATH is set but invalid
+# This prevents llama-cpp-python from trying to load missing CUDA DLLs
+if "CUDA_PATH" in os.environ:
+    os.environ.pop("CUDA_PATH")
+
 import streamlit as st
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
@@ -9,23 +16,30 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
+
+# --- Configuration ---
+# You can set these as environment variables for better configuration management.
+PDF_DATA_PATH = os.getenv("PDF_DATA_PATH", "data/")
+VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "vectorstore")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+HF_INFERENCE_API = os.getenv("HF_INFERENCE_API", "mistralai/Mixtral-8x7B-Instruct-v0.1")
+LOCAL_LLM_PATH = os.getenv("LOCAL_LLM_PATH", "llama-2-7b-chat.Q4_K_M.gguf")
 
 @st.cache_resource
 def load_resources():
     #create embeddings
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2",
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL,
                                        model_kwargs={'device':"cpu"})
 
     # Check if vectorstore exists
-    if os.path.exists("vectorstore"):
-        vector_store = FAISS.load_local("vectorstore", embeddings, allow_dangerous_deserialization=True)
+    if os.path.exists(VECTOR_STORE_PATH):
+        vector_store = FAISS.load_local(VECTOR_STORE_PATH, embeddings, allow_dangerous_deserialization=True)
         return vector_store
 
     #load the pdf files from the path
-    loader = DirectoryLoader('data/',glob="*.pdf",loader_cls=PyPDFLoader)
+    loader = DirectoryLoader(PDF_DATA_PATH, glob="*.pdf", loader_cls=PyPDFLoader)
     documents = loader.load()
 
     #split text into chunks
@@ -34,7 +48,7 @@ def load_resources():
 
     #vectorstore
     vector_store = FAISS.from_documents(text_chunks,embeddings)
-    vector_store.save_local("vectorstore")
+    vector_store.save_local(VECTOR_STORE_PATH)
     return vector_store
 
 vector_store = load_resources()
@@ -44,19 +58,21 @@ def load_llm():
     # Check for Hugging Face API token
     if os.getenv("HUGGINGFACEHUB_API_TOKEN"):
         llm = HuggingFaceEndpoint(
-            repo_id="mistralai/Mixtral-8x7B-Instruct-v0.1",
+            repo_id=HF_INFERENCE_API,
             temperature=0.1,
-            max_length=128
+            max_new_tokens=512 # Use max_new_tokens for more control over output length
         )
     else:
         #create llm
-        # Replaced CTransformers with LlamaCpp (requires llama-cpp-python)
-        # Note: GGML is deprecated. Please download a GGUF model (e.g., llama-2-7b-chat.Q4_K_M.gguf) and install llama-cpp-python
+        # Using LlamaCpp for local GGUF models.
+        # Note: The old GGML format is deprecated. Please download a GGUF model and install llama-cpp-python.
         llm = LlamaCpp(
-            model_path="llama-2-7b-chat.Q4_K_M.gguf",
+            model_path=LOCAL_LLM_PATH,
             temperature=0.01,
-            max_tokens=128,
-            n_ctx=2048
+            max_tokens=512, # Increased token limit for more detailed answers
+            n_ctx=2048,
+            n_batch=512, # Explicitly set batch size to avoid GGML assertions
+            n_gpu_layers=0 # Explicitly set to 0 to force CPU usage
         )
     return llm
 

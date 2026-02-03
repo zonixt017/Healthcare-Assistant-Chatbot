@@ -36,7 +36,7 @@ The application is a self-contained Retrieval-Augmented Generation (RAG) system.
 
 5.  **The "Brain": The Large Language Model (LLM):**
     *   **Llama 2:** The project uses a 7-billion parameter `llama-2-7b-chat.ggmlv3.q4_0.bin` model. This quantized model is designed to run efficiently on CPUs without requiring a powerful GPU.
-    *   **CTransformers:** This library allows the Python script to load and run the Llama 2 model directly on your CPU.
+    *   **Llama-cpp-python & HuggingFaceEndpoint:** The `HuggingFaceEndpoint` class from LangChain is used for API-based models. For local inference, `LlamaCpp` (via the `llama-cpp-python` library) allows the Python script to load and run the GGUF model directly on your CPU.
 
 6.  **The Final Chain (ConversationalRetrievalChain):**
     This LangChain component ties everything together. It takes your question, considers the conversation history, retrieves relevant context from the FAISS vector store, builds a detailed prompt, and sends it to the Llama 2 model to generate a response.
@@ -46,10 +46,10 @@ The application is a self-contained Retrieval-Augmented Generation (RAG) system.
 *   **Python**
 *   **Streamlit:** For the web-based user interface.
 *   **LangChain:** As the core framework for building the RAG pipeline.
-*   **Hugging Face Transformers:** For embeddings and model interaction.
-*   **Llama 2:** A 7-billion parameter LLM for generating answers.
+*   **Hugging Face:** For embeddings (`sentence-transformers`) and model hosting (`HuggingFaceEndpoint`).
+*   **Llama 2 (GGUF):** A 7-billion parameter LLM for local, CPU-based inference.
 *   **FAISS:** For efficient similarity search in the vector store.
-*   **CTransformers:** To run the quantized LLM on a CPU.
+*   **LlamaCpp:** To run the quantized GGUF LLM on a CPU.
 
 ## 🚀 Getting Started
 
