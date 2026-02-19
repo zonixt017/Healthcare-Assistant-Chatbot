@@ -1,45 +1,80 @@
-# Environment variables
-.env
-
+# ─────────────────────────────────────────────────────────────────────────────
 # Python
+# ─────────────────────────────────────────────────────────────────────────────
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-env/
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
+env/
+ENV/
 .venv/
+*.egg-info/
+dist/
+build/
+*.egg
 
-# Large model files
-*.bin
-*.gguf
+# ─────────────────────────────────────────────────────────────────────────────
+# Environment & Secrets
+# ─────────────────────────────────────────────────────────────────────────────
+.env
+*.env.local
+*.env.*.local
 
-On branch main
-Your branch is ahead of 'origin/main' by 4 commits.
-  (use "git push" to publish your local commits)
+# ─────────────────────────────────────────────────────────────────────────────
+# IDE & Editors
+# ─────────────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
 
-Changes to be committed:
-  (use "git restore --staged <file>..." to unstage)
-        modified:   .gitignore
+# ─────────────────────────────────────────────────────────────────────────────
+# OS Generated
+# ─────────────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 
-Changes not staged for commit:
-  (use "git add/rm <file>..." to update what will be committed)
-  (use "git restore <file>..." to discard changes in working directory)
-        deleted:    .devcontainer/devcontainer.json
-On branch main
-Your branch is ahead of 'origin/main' by 4 commits.
-  (use "git push" to publish your local commits)
+# ─────────────────────────────────────────────────────────────────────────────
+# Project Specific
+# ─────────────────────────────────────────────────────────────────────────────
 
-Changes to be committed:
-  (use "git restore --staged <file>..." to unstage)
-        modified:   .gitignore
-
-Changes not staged for commit:
-  (use "git add/rm <file>..." to update what will be committed)
-  (use "git restore <file>..." to discard changes in working directory)
-        deleted:    .devcontainer/devcontainer.json
-.devcontainer/
-
-medical assistant.pdf
-
+# Vector store (auto-generated, can be large)
 vectorstore/
+
+# GGUF model files (large binary files — download separately)
+models/
+*.gguf
+*.bin
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/

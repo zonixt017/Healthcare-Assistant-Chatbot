@@ -1,115 +1,265 @@
-# HealthCare ChatBot 🧑🏽‍⚕️
+# 🩺 HealthCare Assistant Chatbot
 
-An AI-powered medical chatbot that uses a Retrieval-Augmented Generation (RAG) architecture to answer questions from a medical PDF document. The entire application runs locally on your machine.
+An AI-powered medical chatbot built with **Retrieval-Augmented Generation (RAG)**. It answers health and medical questions grounded in a real PDF knowledge base, with conversational memory and source attribution.
 
-## 📜 About The Project
+> ⚠️ **Disclaimer:** This tool is for *informational purposes only* and does **not** replace professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare professional.
 
-This repository contains a medical chatbot application built to provide accurate, context-aware answers from a specific medical PDF document. It leverages a local Large Language Model (LLM) and a vector database to create a powerful, private, and efficient question-answering system.
+---
 
-The core idea is to provide an external knowledge source to the LLM when it answers a question, rather than relying solely on the model's pre-trained knowledge. This makes the answers more accurate and specific to the provided data.
+## ✨ Features
 
-### Core Features
+| Feature | Description |
+|---------|-------------|
+| 🚀 **GPU Accelerated** | Runs on GTX 1650 (4GB VRAM) with CUDA offloading for fast inference |
+| 🔍 **RAG Pipeline** | Answers grounded in retrieved documents — no hallucination |
+| 🧠 **Conversational Memory** | Multi-turn chat with context-aware follow-up questions |
+| ☁️ **Cloud + Local LLM** | HuggingFace Inference API with automatic fallback to local GGUF |
+| 📄 **Source Attribution** | Every answer shows exact PDF pages it was drawn from |
+| 🎯 **MMR Retrieval** | Maximal Marginal Relevance for diverse, non-redundant context |
+| 🖥️ **Modern UI** | Clean Streamlit interface with status badges and controls |
+| 🐳 **Docker Ready** | One-command deployment to any cloud platform |
 
-*   **AI-Powered Medical Chatbot:** A conversational AI to answer questions about a medical knowledge base.
-*   **Retrieval-Augmented Generation (RAG):** The chatbot uses a RAG pipeline for accurate, context-aware answers.
-*   **Local & Private:** Utilizes a local Llama 2 LLM, ensuring data privacy and offline functionality.
-*   **Semantic Search:** Implements semantic search over a PDF document to find the most relevant information.
-*   **Interactive UI:** Built with Streamlit, featuring chat history and conversational memory for follow-up questions.
+---
 
-## ⚙️ How It Works (Architecture)
+## 🏗️ Architecture
 
-The application is a self-contained Retrieval-Augmented Generation (RAG) system. Here is a detailed breakdown of each component:
+```
+User Question
+      │
+      ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Streamlit UI (app.py)                 │
+└─────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────────────────────────┐
+│              History-Aware Retriever (LangChain)         │
+│  Rewrites question using chat history into standalone   │
+└─────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌─────────────────────────────────────────────────────────┐
+│           FAISS Vector Store (MMR Search)               │
+│  Retrieves top-k diverse chunks from embedded PDFs      │
+└─────────────────────────────────────────────────────────┘
+      │  retrieved context
+      ▼
+┌─────────────────────────────────────────────────────────┐
+│                        LLM                               │
+│  ☁️ HuggingFace Inference API (Mistral-7B)             │
+│  🚀 Local GGUF + GPU (Phi-2 / TinyLlama / Mistral)     │
+└─────────────────────────────────────────────────────────┘
+      │
+      ▼
+   Answer  +  Source Documents
+```
 
-1.  **User Interface (Streamlit):**
-    The `app.py` script uses Streamlit to create the chatbot interface you interact with. It handles displaying the title, rendering the chat history, and providing an input box for you to type your questions.
+---
 
-2.  **Orchestration Framework (LangChain):**
-    LangChain is the glue that holds the entire application together. It manages the flow of data from the initial PDF document to the final answer generated by the Llama 2 model.
-
-3.  **Data Ingestion and Processing:**
-    *   **PyPDFLoader:** The application reads the `data/MEDICAL.pdf` file using `pypdf`. LangChain's `DirectoryLoader` is configured to load PDF files from the `data/` directory.
-    *   **RecursiveCharacterTextSplitter:** Since LLMs have a limited context window, the PDF is broken down into smaller, overlapping chunks to ensure semantic meaning isn't lost.
-
-4.  **Semantic Understanding and Retrieval:**
-    *   **HuggingFaceEmbeddings:** The application uses the `sentence-transformers/all-MiniLM-L6-v2` model to create "embeddings"—numerical vector representations of the text chunks. This runs locally on your CPU.
-    *   **FAISS Vector Store:** The embeddings are loaded into a FAISS (Facebook AI Similarity Search) vector store. When you ask a question, FAISS compares your question's vector to all the chunk vectors to retrieve the most semantically similar text chunks. This is the "Retrieval" part of RAG.
-
-5.  **The "Brain": The Large Language Model (LLM):**
-    *   **Llama 2:** The project uses a 7-billion parameter `llama-2-7b-chat.ggmlv3.q4_0.bin` model. This quantized model is designed to run efficiently on CPUs without requiring a powerful GPU.
-    *   **Llama-cpp-python & HuggingFaceEndpoint:** The `HuggingFaceEndpoint` class from LangChain is used for API-based models. For local inference, `LlamaCpp` (via the `llama-cpp-python` library) allows the Python script to load and run the GGUF model directly on your CPU.
-
-6.  **The Final Chain (ConversationalRetrievalChain):**
-    This LangChain component ties everything together. It takes your question, considers the conversation history, retrieves relevant context from the FAISS vector store, builds a detailed prompt, and sends it to the Llama 2 model to generate a response.
-
-## 🛠️ Technology Stack
-
-*   **Python**
-*   **Streamlit:** For the web-based user interface.
-*   **LangChain:** As the core framework for building the RAG pipeline.
-*   **Hugging Face:** For embeddings (`sentence-transformers`) and model hosting (`HuggingFaceEndpoint`).
-*   **Llama 2 (GGUF):** A 7-billion parameter LLM for local, CPU-based inference.
-*   **FAISS:** For efficient similarity search in the vector store.
-*   **LlamaCpp:** To run the quantized GGUF LLM on a CPU.
-
-## 🚀 Getting Started
-
-Follow these instructions to set up and run the project on your local machine.
+## 🚀 Quick Start
 
 ### Prerequisites
 
-*   Python 3.8 or higher
-*   Git (for cloning the repository)
+- Python 3.9+
+- Git
+- (Optional) NVIDIA GPU with CUDA support for local inference
 
-### Installation & Setup
+### 1. Clone & Setup
 
-1.  **Clone the repository:**
-    ```sh
-    git clone https://github.com/<your-username>/LLama2HealthCareChatBot.git
-    cd LLama2HealthCareChatBot
-    ```
+```bash
+git clone https://github.com/zonixt017/Healthcare-Assistant-Chatbot.git
+cd Healthcare-Assistant-Chatbot
 
-2.  **Create and activate a virtual environment:**
-    ```sh
-    # For Windows
-    python -m venv env
-    .\env\Scripts\activate
+# Create virtual environment
+python -m venv venv
 
-    # For macOS/Linux
-    python3 -m venv env
-    source env/bin/activate
-    ```
+# Activate (Windows)
+.\venv\Scripts\activate
 
-3.  **Install dependencies:**
-    ```sh
-    pip install -r requirements.txt
-    ```
+# Activate (macOS/Linux)
+source venv/bin/activate
 
-4.  **Download the LLM Model:**
-    Download the `llama-2-7b-chat.ggmlv3.q4_0.bin` model file from the following link and place it in the root directory of the project.
-    *   **Model:** `llama-2-7b-chat.ggmlv3.q4_0.bin`
-    *   **Download Link:** [TheBloke/Llama-2-7B-Chat-GGML](https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGML/resolve/main/llama-2-7b-chat.ggmlv3.q4_0.bin)
+# Install dependencies
+pip install -r requirements.txt
+```
 
-5.  **Add Your Data:**
-    Place the PDF document you want to chat with inside the `data/` directory. The application is currently configured to use `MEDICAL.pdf`.
+### 2. Configure Environment
 
-## ▶️ Usage
+```bash
+cp .env.example .env
+```
 
-Once the setup is complete, you can run the Streamlit application with the following command:
+Edit `.env` and add your HuggingFace token (free at https://huggingface.co/settings/tokens):
 
-```sh
+```env
+HUGGINGFACEHUB_API_TOKEN=hf_your_token_here
+```
+
+### 3. Add PDF Knowledge Base
+
+Place your medical PDF files in the `data/` directory:
+
+```
+data/
+└── your-medical-reference.pdf
+```
+
+### 4. Run
+
+```bash
 streamlit run app.py
 ```
 
-This will open a new tab in your web browser with the HealthCare ChatBot interface.
+The app opens at `http://localhost:8501`.
+
+---
+
+## 🖥️ GPU Acceleration (Recommended)
+
+For **much faster** local inference on your GTX 1650 (4GB VRAM), see **[WIFI_SETUP_GUIDE.md](WIFI_SETUP_GUIDE.md)** for:
+
+1. Installing CUDA-enabled PyTorch
+2. Installing CUDA-enabled llama-cpp-python
+3. Downloading optimized GGUF models
+
+### Recommended Models for GTX 1650 (4GB VRAM)
+
+| Model | Size | Quality | GPU Layers | Speed |
+|-------|------|---------|------------|-------|
+| **Phi-2 Q4_K_M** | 1.7 GB | ⭐⭐⭐⭐ | 32 (all) | ~20 tok/s |
+| TinyLlama Q4_K_M | 0.7 GB | ⭐⭐⭐ | 22 (all) | ~40 tok/s |
+| Mistral-7B Q4_K_M | 4.1 GB | ⭐⭐⭐⭐⭐ | 20-24 | ~10 tok/s |
+
+---
 
 ## 📂 Project Structure
 
 ```
-.
-├─── app.py             # Main Streamlit application file
-├─── data/
-│    └─── MEDICAL.pdf    # Knowledge base for the chatbot
-├─── llama-2-7b-chat.ggmlv3.q4_0.bin  # The LLM model file
-├─── requirements.txt   # Python dependencies
-└─── README.md          # This file
+Healthcare-Assistant-Chatbot/
+├── app.py                    # Main Streamlit application
+├── requirements.txt          # Python dependencies
+├── Dockerfile                # Docker image definition
+├── docker-compose.yml        # Docker Compose for local dev
+├── .env.example              # Environment template
+├── .gitignore                # Git ignore rules
+├── README.md                 # This file
+├── WIFI_SETUP_GUIDE.md       # GPU setup instructions
+├── .streamlit/
+│   └── config.toml           # Streamlit theme & settings
+├── data/                     # PDF knowledge base
+│   └── *.pdf
+├── models/                   # GGUF models (download separately)
+│   └── *.gguf
+├── vectorstore/              # FAISS index (auto-generated)
+└── extras/                   # Project docs & assets
 ```
+
+---
+
+## ⚙️ Configuration
+
+All settings in `.env`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HUGGINGFACEHUB_API_TOKEN` | *(none)* | HF token for cloud inference |
+| `HF_INFERENCE_API` | `mistralai/Mistral-7B-Instruct-v0.2` | Cloud model ID |
+| `LOCAL_LLM_PATH` | `models/phi-2.Q4_K_M.gguf` | Local GGUF model path |
+| `N_GPU_LAYERS` | `32` | GPU layers to offload (0 = CPU) |
+| `PDF_DATA_PATH` | `data/` | PDF directory |
+| `VECTOR_STORE_PATH` | `vectorstore` | FAISS index location |
+| `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model |
+| `RETRIEVER_K` | `3` | Chunks to retrieve |
+
+---
+
+## 🌐 Deployment
+
+> 📖 **See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed instructions.**
+
+### 🏆 Recommended: HuggingFace Spaces (Free)
+
+**Why HuggingFace Spaces?**
+- ✅ **Free tier** with 16GB RAM, 2 vCPUs
+- ✅ **Persistent storage** for vector store
+- ✅ **Native integration** with HuggingFace Inference API
+- ✅ **Portfolio visibility** - shows on your HF profile
+- ✅ **No credit card required**
+
+**Quick Deploy:**
+
+1. Create a free account at [huggingface.co](https://huggingface.co)
+2. Go to [huggingface.co/new-space](https://huggingface.co/new-space)
+3. Select **Docker** as SDK
+4. Upload your code or connect GitHub repo
+5. Add secret: `HUGGINGFACEHUB_API_TOKEN` = your_token
+6. Deploy! Your app will be at `username-healthcare-assistant.hf.space`
+
+### Alternative Platforms
+
+| Platform | Free Tier | Best For |
+|----------|-----------|----------|
+| **HuggingFace Spaces** | ✅ Generous | Portfolio, HF integration |
+| **Render.com** | ❌ $7+/mo | Professional apps |
+| **Railway.app** | ⚠️ $5 credit | Quick deployment |
+| **Fly.io** | ✅ Limited | Global distribution |
+| **Google Cloud Run** | ✅ Generous | Enterprise apps |
+
+### Docker (Local / Any Cloud)
+
+```bash
+# Build
+docker build -t healthcare-chatbot .
+
+# Run locally
+docker run -p 7860:7860 \
+  -e HUGGINGFACEHUB_API_TOKEN=your_token \
+  healthcare-chatbot
+
+# Or with docker-compose
+docker-compose up -d
+```
+
+### Platform-Specific Configs
+
+This project includes ready-to-use configuration files:
+
+- `render.yaml` - Render.com deployment
+- `fly.toml` - Fly.io deployment
+- `docker-compose.yml` - Docker Compose for local/any cloud
+
+---
+
+## 🔒 Security
+
+- **Never commit `.env`** — it's in `.gitignore`
+- **Never commit `models/`** — GGUF files are large binaries
+- **Rotate tokens** immediately if accidentally exposed
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| UI | [Streamlit](https://streamlit.io/) |
+| Orchestration | [LangChain](https://python.langchain.com/) |
+| Embeddings | [sentence-transformers](https://huggingface.co/sentence-transformers) |
+| Vector Store | [FAISS](https://github.com/facebookresearch/faiss) |
+| Cloud LLM | [HuggingFace Inference API](https://huggingface.co/inference-api) |
+| Local LLM | [llama-cpp-python](https://github.com/abetlen/llama-cpp-python) |
+| PDF Parsing | [pypdf](https://pypdf.readthedocs.io/) |
+
+---
+
+## 📄 License
+
+MIT License — feel free to use, modify, and distribute.
+
+---
+
+## 🙏 Acknowledgments
+
+- [LangChain](https://github.com/langchain-ai/langchain) for the RAG framework
+- [llama.cpp](https://github.com/ggerganov/llama.cpp) for efficient local inference
+- [HuggingFace](https://huggingface.co/) for model hosting and inference API

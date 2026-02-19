@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Streamlit Configuration
+# These settings apply when running locally and when deployed
+# ─────────────────────────────────────────────────────────────────────────────
+
+[theme]
+primaryColor = "#ef4444"
+backgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#e2e8f0"
+textColor = "#0f172a"
+font = "sans-serif"
+
+[server]
+port = 8501
+address = "localhost"
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+maxUploadSize = 50
+
+[browser]
+gatherUsageStats = false
+showErrorDetails = true
+
+[runner]
+magicEnabled = true
+installTracer = false
+fixMatplotlib = true
+
+[client]
+showErrorDetails = true
+toolbarMode = "minimal"
