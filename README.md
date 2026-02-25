@@ -164,6 +164,7 @@ All settings in `.env`:
 |----------|---------|-------------|
 | `HUGGINGFACEHUB_API_TOKEN` | *(none)* | HF token for cloud inference |
 | `HF_INFERENCE_API` | `mistralai/Mistral-7B-Instruct-v0.2` | Cloud model ID |
+| `HF_API_TIMEOUT` | `45` | Cloud inference request timeout (seconds) |
 | `LOCAL_LLM_PATH` | `models/phi-2.Q4_K_M.gguf` | Local GGUF model path |
 | `N_GPU_LAYERS` | `32` | GPU layers to offload (0 = CPU) |
 | `PDF_DATA_PATH` | `data/` | PDF directory |
@@ -175,58 +176,51 @@ All settings in `.env`:
 
 ## 🌐 Deployment
 
-> 📖 **See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed instructions.**
+> 📖 **See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed, production-style instructions.**
 
-### 🏆 Recommended: HuggingFace Spaces (Free)
+### 🏆 Recommended (Free): Hugging Face Spaces
 
-**Why HuggingFace Spaces?**
-- ✅ **Free tier** with 16GB RAM, 2 vCPUs
-- ✅ **Persistent storage** for vector store
-- ✅ **Native integration** with HuggingFace Inference API
-- ✅ **Portfolio visibility** - shows on your HF profile
-- ✅ **No credit card required**
+1. Create a Space at [huggingface.co/new-space](https://huggingface.co/new-space)
+2. Choose **Docker** SDK
+3. Push this repo
+4. Add secret: `HUGGINGFACEHUB_API_TOKEN`
+5. Open your public URL: `https://<username>-<space-name>.hf.space`
 
-**Quick Deploy:**
+**Do I need to upload a local LLM file to Spaces?**
+- **No (recommended):** keep using `HUGGINGFACEHUB_API_TOKEN` + `HF_INFERENCE_API` and do cloud inference.
+- **Only upload/download GGUF** if you intentionally want local inference inside the container (usually too large/slow for free tiers).
 
-1. Create a free account at [huggingface.co](https://huggingface.co)
-2. Go to [huggingface.co/new-space](https://huggingface.co/new-space)
-3. Select **Docker** as SDK
-4. Upload your code or connect GitHub repo
-5. Add secret: `HUGGINGFACEHUB_API_TOKEN` = your_token
-6. Deploy! Your app will be at `username-healthcare-assistant.hf.space`
+### Other options
 
-### Alternative Platforms
+| Platform | Cost | Notes |
+|----------|------|-------|
+| **Hugging Face Spaces** | ✅ Free CPU tier | Best for public AI demos |
+| **Fly.io** | ⚠️ Usage-based/credits | Good low-cost global hosting |
+| **Railway / Render** | ❌ Usually paid | Easier ops, not reliably free for Docker |
 
-| Platform | Free Tier | Best For |
-|----------|-----------|----------|
-| **HuggingFace Spaces** | ✅ Generous | Portfolio, HF integration |
-| **Render.com** | ❌ $7+/mo | Professional apps |
-| **Railway.app** | ⚠️ $5 credit | Quick deployment |
-| **Fly.io** | ✅ Limited | Global distribution |
-| **Google Cloud Run** | ✅ Generous | Enterprise apps |
-
-### Docker (Local / Any Cloud)
+### Docker run (local or cloud VM)
 
 ```bash
-# Build
+# Build image
 docker build -t healthcare-chatbot .
 
-# Run locally
-docker run -p 7860:7860 \
-  -e HUGGINGFACEHUB_API_TOKEN=your_token \
-  healthcare-chatbot
+# Run with env file (recommended)
+docker run --rm -p 7860:7860 --env-file .env healthcare-chatbot
 
 # Or with docker-compose
-docker-compose up -d
+docker compose up -d
 ```
 
-### Platform-Specific Configs
+The container now respects `PORT` automatically via `start.sh`, so it works on platforms that inject dynamic ports.
 
-This project includes ready-to-use configuration files:
+### Included deployment files
 
-- `render.yaml` - Render.com deployment
-- `fly.toml` - Fly.io deployment
-- `docker-compose.yml` - Docker Compose for local/any cloud
+- `Dockerfile` - production container image
+- `start.sh` - dynamic Streamlit startup (`PORT` aware)
+- `.dockerignore` - smaller, faster builds
+- `render.yaml` - Render blueprint
+- `fly.toml` - Fly.io app config
+- `docker-compose.yml` - local dev/test orchestration
 
 ---
 
