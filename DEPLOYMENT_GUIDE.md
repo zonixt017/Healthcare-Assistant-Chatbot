@@ -1,378 +1,160 @@
-# 🚀 Deployment Guide
+# 🚀 Deployment Guide (Production + Free Demo Hosting)
 
-This guide covers the best deployment options for the Healthcare Assistant Chatbot, with detailed instructions for each platform.
+This project is already structured for deployment with Docker and environment variables. This guide focuses on **free or near-free** ways to put your chatbot online so you can share a live demo.
 
 ---
 
-## 🏆 Recommended: HuggingFace Spaces
+## 1) Production Readiness Checklist
 
-**Why HuggingFace Spaces is the best choice:**
+Before deploying publicly, make sure you have the following:
 
-| Feature | HuggingFace Spaces |
-|---------|-------------------|
-| **Free Tier** | ✅ 16GB RAM, 2 vCPUs |
-| **Persistent Storage** | ✅ Yes (for vector store) |
-| **Docker Support** | ✅ Docker SDK |
-| **Custom Domain** | ✅ Optional |
-| **Portfolio Visibility** | ✅ Shows on HF profile |
-| **URL Format** | `username-healthcare-assistant.hf.space` |
-| **Native Integration** | ✅ Works with HF Inference API |
+- [ ] `HUGGINGFACEHUB_API_TOKEN` set as a secret on your hosting platform.
+- [ ] At least one PDF in `data/` for your knowledge base.
+- [ ] `vectorstore/` is **not** committed (it is generated automatically).
+- [ ] `models/` is **not** required in cloud deploy (cloud inference is recommended for free hosting).
+- [ ] `PORT` is handled dynamically (already handled by `start.sh`).
+- [ ] A health endpoint exists (`/_stcore/health`).
 
-### Architecture for HF Spaces
+---
 
+## 2) Best Free Option: Hugging Face Spaces (Docker)
+
+### Why this is best for demos
+- Free CPU hosting for public projects.
+- Built-in HTTPS URL.
+- Docker-supported workflow.
+- Great for AI app showcases.
+
+### Steps
+1. Create a new Space at https://huggingface.co/new-space
+2. Choose:
+   - **SDK**: Docker
+   - **Hardware**: CPU Basic (free)
+3. Push this repository to the Space.
+4. Add this secret in **Settings → Variables and secrets**:
+   - `HUGGINGFACEHUB_API_TOKEN`
+5. Wait for build, then open your public URL:
+   - `https://<username>-<space-name>.hf.space`
+
+### Do I need to upload a local LLM (`.gguf`) to Hugging Face Spaces?
+- **No, not for your current hybrid setup.**
+- In free-tier hosting, prefer cloud inference via:
+  - `HUGGINGFACEHUB_API_TOKEN` (secret)
+  - `HF_INFERENCE_API` (model ID)
+- Uploading local model weights is optional and usually not ideal for free CPUs due to size + startup time.
+
+### Notes
+- First run may be slower while embeddings/vector index are built.
+- Free Spaces may sleep when idle (cold starts are normal).
+
+---
+
+## 3) Another Free Option: Fly.io (with usage limits)
+
+Fly.io can be free for very small workloads depending on current credits/promotions. Treat as **low-cost**, not guaranteed permanent free.
+
+### Steps
+```bash
+fly auth login
+fly launch --no-deploy
+fly secrets set HUGGINGFACEHUB_API_TOKEN=your_token
+fly deploy
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    HuggingFace Space                         │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐ │
-│  │   Streamlit UI  │  │  FAISS Vector   │  │ Embeddings   │ │
-│  │   (app.py)      │  │  Store (local)  │  │ (CPU)        │ │
-│  └────────┬────────┘  └────────┬────────┘  └──────────────┘ │
-└───────────┼────────────────────┼─────────────────────────────┘
-            │                    │
-            ▼                    ▼
-┌─────────────────────────────────────────────────────────────┐
-│              HuggingFace Inference API (Cloud)               │
-│              Mistral-7B-Instruct-v0.2                        │
-│              (No local model needed!)                        │
-└─────────────────────────────────────────────────────────────┘
+
+### URL
+- Fly gives you a public HTTPS URL like:
+  - `https://<app-name>.fly.dev`
+
+---
+
+## 4) Easy Public Demo Alternatives (No backend infra)
+
+If you only need a quick demo and are fine with occasional downtime:
+
+- **Streamlit Community Cloud** (free)  
+  Works best when dependencies are light. This app can run, but build time may be high due to ML packages.
+
+- **Google Cloud Run / Railway / Render**  
+  Usually paid or trial-based now; good for stable demos if budget allows.
+
+---
+
+## 5) Environment Variables You Should Set
+
+Minimum for public deployment:
+
+```env
+HUGGINGFACEHUB_API_TOKEN=hf_xxx
+HF_INFERENCE_API=mistralai/Mistral-7B-Instruct-v0.2
+HF_API_TIMEOUT=45
+PDF_DATA_PATH=data/
+VECTOR_STORE_PATH=vectorstore
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+RETRIEVER_K=3
+EMBED_DEVICE=cpu
+N_GPU_LAYERS=0
 ```
 
-### Step-by-Step Deployment
+For free hosting, keep `EMBED_DEVICE=cpu` and `N_GPU_LAYERS=0`.
 
-#### 1. Prepare Your Repository
+### About model callability
+Some model IDs may exist on Hugging Face but still fail on serverless inference depending on provider availability, limits, or permissions.
+If calls fail, switch `HF_INFERENCE_API` to another instruct model that is currently available for Inference API usage.
 
-Ensure your repo has these files:
+---
 
-```
-your-repo/
-├── app.py
-├── requirements.txt
-├── Dockerfile
-├── README.md
-├── data/
-│   └── your-medical-pdf.pdf
-└── .env.example (for reference only)
-```
+## 6) Validate Hugging Face API before deploying
 
-#### 2. Create a HuggingFace Account
-
-1. Go to [huggingface.co](https://huggingface.co) and sign up (free)
-2. Verify your email
-
-#### 3. Create a New Space
-
-1. Go to [huggingface.co/new-space](https://huggingface.co/new-space)
-2. Fill in the details:
-   - **Owner:** Your username
-   - **Space name:** `healthcare-assistant` (or your preference)
-   - **License:** MIT
-   - **SDK:** Choose **Docker**
-   - **Hardware:** CPU basic (free) or upgrade to GPU for faster embeddings
-3. Click **Create Space**
-
-#### 4. Set Up Secrets (Environment Variables)
-
-1. Go to your Space → **Settings** → **Variables and secrets**
-2. Add a new secret:
-   - **Name:** `HUGGINGFACEHUB_API_TOKEN`
-   - **Value:** Your HF token (get it from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens))
-3. Click **Save**
-
-#### 5. Upload Your Code
-
-**Option A: Upload via Web UI**
-
-1. Go to your Space → **Files** tab
-2. Click **Add file** → **Upload files**
-3. Upload all your project files
-
-**Option B: Push via Git (Recommended)**
+Run this once locally to confirm your token + model ID are callable:
 
 ```bash
-# Clone your Space (replace with your username)
-git clone https://huggingface.co/spaces/YOUR_USERNAME/healthcare-assistant
-
-# Copy your project files
-cp -r Healthcare-Assistant-Chatbot/* healthcare-assistant/
-
-# Navigate to the Space
-cd healthcare-assistant
-
-# Add, commit, push
-git add .
-git commit -m "Initial deployment"
-git push
+export HUGGINGFACEHUB_API_TOKEN=hf_xxx
+export HF_INFERENCE_API=mistralai/Mistral-7B-Instruct-v0.2
+python scripts/validate_hf_inference.py
 ```
 
-#### 6. Wait for Build
-
-- HuggingFace will automatically build your Docker image
-- Check the **Logs** tab for build progress
-- First build takes 5-10 minutes
-
-#### 7. Access Your App
-
-Once built, your app will be available at:
-```
-https://YOUR_USERNAME-healthcare-assistant.hf.space
-```
-
-### Important Notes for HF Spaces
-
-1. **Use Cloud LLM:** Set `HUGGINGFACEHUB_API_TOKEN` to use cloud inference (no local model needed)
-2. **Vector Store:** First run will build the vector store; subsequent runs use cached version
-3. **Memory:** Free tier has 16GB RAM - sufficient for embeddings + FAISS
-4. **Cold Starts:** Free tier apps sleep after inactivity; first load takes ~30 seconds
+If this fails, deployment will likely fail cloud mode too. Switch model or token first.
 
 ---
 
-## 🔄 Alternative: Render.com
+## 7) Local Smoke Test Before Deploy
 
-**Best for:** Professional deployment with custom domain
+```bash
+cp .env.example .env
+# edit .env with your HF token
 
-### Pricing
-- **Free:** Not available for Docker
-- **Starter:** $7/month
-- **Standard:** $25/month
-
-### Deployment Steps
-
-1. Go to [render.com](https://render.com) and sign up
-2. Click **New** → **Web Service**
-3. Connect your GitHub repository
-4. Configure:
-   - **Name:** healthcare-assistant
-   - **Region:** Choose closest to you
-   - **Branch:** main
-   - **Runtime:** Docker
-   - **Instance Type:** Starter ($7/mo) or higher
-5. Add environment variables:
-   - `HUGGINGFACEHUB_API_TOKEN` = your_token
-6. Click **Deploy Web Service**
-
-### Render Configuration
-
-Create a `render.yaml` file:
-
-```yaml
-services:
-  - type: web
-    name: healthcare-assistant
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    envVars:
-      - key: HUGGINGFACEHUB_API_TOKEN
-        sync: false
-      - key: PYTHON_VERSION
-        value: 3.11.0
-    plan: starter
-    healthCheckPath: /_stcore/health
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
----
+Docker test:
 
-## 🚂 Alternative: Railway.app
-
-**Best for:** Quick deployment with good DX
-
-### Pricing
-- **Free Trial:** $5 credit (one-time)
-- **Hobby:** $5/month (usage-based)
-
-### Deployment Steps
-
-1. Go to [railway.app](https://railway.app) and sign up with GitHub
-2. Click **New Project** → **Deploy from GitHub repo**
-3. Select your repository
-4. Railway auto-detects Docker
-5. Add environment variables:
-   - `HUGGINGFACEHUB_API_TOKEN` = your_token
-6. Deploy!
-
-### Railway Configuration
-
-Create a `railway.toml` file:
-
-```toml
-[build]
-builder = "dockerfile"
-
-[deploy]
-healthcheckPath = "/_stcore/health"
-healthcheckTimeout = 300
-restartPolicyType = "on_failure"
+```bash
+docker build -t healthcare-assistant .
+docker run --rm -p 7860:7860 --env-file .env healthcare-assistant
 ```
 
----
-
-## ✈️ Alternative: Fly.io
-
-**Best for:** Edge deployment with global distribution
-
-### Pricing
-- **Free:** 3 VMs, 3GB volume
-- **Paid:** Usage-based
-
-### Deployment Steps
-
-1. Install Fly CLI:
-   ```bash
-   # Windows (PowerShell)
-   iwr https://fly.io/install.ps1 -useb | iex
-   
-   # macOS/Linux
-   curl -L https://fly.io/install.sh | sh
-   ```
-
-2. Login:
-   ```bash
-   fly auth login
-   ```
-
-3. Deploy:
-   ```bash
-   fly launch
-   ```
-
-4. Set secrets:
-   ```bash
-   fly secrets set HUGGINGFACEHUB_API_TOKEN=your_token
-   ```
-
-### Fly.io Configuration
-
-Create a `fly.toml` file:
-
-```toml
-app = "healthcare-assistant"
-primary_region = "sin"
-
-[build]
-  dockerfile = "Dockerfile"
-
-[env]
-  PORT = "8501"
-
-[http_service]
-  internal_port = 8501
-  force_https = true
-  auto_stop_machines = true
-  auto_start_machines = true
-  min_machines_running = 0
-
-[[http_service.checks]]
-  grace_period = "60s"
-  interval = "30s"
-  method = "GET"
-  path = "/_stcore/health"
-  timeout = "10s"
-
-[[vm]]
-  memory = "2gb"
-  cpu_kind = "shared"
-  cpus = 2
-```
+Open: `http://localhost:7860`
 
 ---
 
-## ☁️ Alternative: Google Cloud Run
+## 8) Security + Reliability Notes
 
-**Best for:** Enterprise-grade, scalable deployment
-
-### Pricing
-- **Free Tier:** 2 million requests/month
-- **Paid:** Usage-based
-
-### Deployment Steps
-
-1. Install Google Cloud CLI
-2. Authenticate:
-   ```bash
-   gcloud auth login
-   ```
-
-3. Build and deploy:
-   ```bash
-   gcloud run deploy healthcare-assistant \
-     --source . \
-     --platform managed \
-     --region us-central1 \
-     --allow-unauthenticated \
-     --set-env-vars HUGGINGFACEHUB_API_TOKEN=your_token \
-     --memory 4Gi \
-     --cpu 2
-   ```
+- Do **not** commit `.env` or tokens.
+- Keep secrets in host platform secret manager only.
+- Keep your disclaimer visible in UI (already present).
+- Prefer cloud inference token over bundling local LLM weights in production.
+- Monitor logs for model API timeouts or rate limits.
 
 ---
 
-## 📊 Comparison Summary
+## 9) Suggested “Showcase” Setup (Free)
 
-| Platform | Free Tier | Setup Difficulty | Best For |
-|----------|-----------|------------------|----------|
-| **HuggingFace Spaces** | ✅ Generous | ⭐ Easy | Portfolio, HF integration |
-| Render.com | ❌ No | ⭐ Easy | Professional apps |
-| Railway.app | ⚠️ Limited | ⭐ Easy | Quick deployment |
-| Fly.io | ✅ Limited | ⭐⭐ Medium | Global distribution |
-| Google Cloud Run | ✅ Generous | ⭐⭐⭐ Hard | Enterprise apps |
+For portfolio/demo use:
 
----
+1. Deploy to **Hugging Face Spaces**.
+2. Add screenshots/GIF + live link in `README.md`.
+3. Add sample prompts users can try.
+4. Keep one stable medical PDF in `data/` for predictable responses.
 
-## 🎯 Recommendation
-
-**For your portfolio:** Use **HuggingFace Spaces**
-
-**Reasons:**
-1. Completely free with generous resources
-2. Native integration with HuggingFace ecosystem
-3. Shows on your HF profile (great for portfolio)
-4. Easy to share and demo
-5. No credit card required
-
-**For production:** Consider **Render.com** or **Google Cloud Run** for:
-- Custom domains
-- SLA guarantees
-- Enterprise features
-- Better scaling options
-
----
-
-## 🔧 Pre-Deployment Checklist
-
-- [ ] Set `HUGGINGFACEHUB_API_TOKEN` in environment variables
-- [ ] Ensure PDF files are in `data/` directory
-- [ ] Test Docker build locally: `docker build -t test . && docker run -p 8501:8501 test`
-- [ ] Verify `.env` is NOT committed (check `.gitignore`)
-- [ ] Update README with your Space URL after deployment
-
----
-
-## 🆘 Troubleshooting
-
-### Build Fails
-- Check build logs for specific errors
-- Ensure all dependencies in `requirements.txt` are correct
-- Try building locally first with Docker
-
-### App Crashes on Start
-- Check memory usage - upgrade instance if needed
-- Verify environment variables are set correctly
-- Check logs for Python errors
-
-### Slow First Load
-- Normal for free tiers (cold start)
-- Vector store builds on first run
-- Subsequent loads are faster
-
-### HuggingFace API Errors
-- Verify token is valid and has correct permissions
-- Check API rate limits
-- Ensure model ID is correct
-
----
-
-## 📞 Support
-
-- **HuggingFace Docs:** [huggingface.co/docs/hub/spaces](https://huggingface.co/docs/hub/spaces)
-- **Render Docs:** [render.com/docs](https://render.com/docs)
-- **Railway Docs:** [docs.railway.app](https://docs.railway.app)
-- **Fly.io Docs:** [fly.io/docs](https://fly.io/docs)
+This gives you a public URL you can share in resumes, LinkedIn, and project portfolios.
