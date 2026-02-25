@@ -198,6 +198,18 @@ All settings in `.env`:
 | **Fly.io** | ⚠️ Usage-based/credits | Good low-cost global hosting |
 | **Railway / Render** | ❌ Usually paid | Easier ops, not reliably free for Docker |
 
+### Pre-deployment validation (recommended)
+
+Before deploying, validate that your Hugging Face token can actually call your configured model:
+
+```bash
+export HUGGINGFACEHUB_API_TOKEN=hf_xxx
+export HF_INFERENCE_API=mistralai/Mistral-7B-Instruct-v0.2
+python scripts/validate_hf_inference.py
+```
+
+If this command fails, fix token/model availability first; deployment will otherwise fall back to local GGUF (if present) or fail startup.
+
 ### Docker run (local or cloud VM)
 
 ```bash

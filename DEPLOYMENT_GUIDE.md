@@ -103,7 +103,21 @@ If calls fail, switch `HF_INFERENCE_API` to another instruct model that is curre
 
 ---
 
-## 6) Local Smoke Test Before Deploy
+## 6) Validate Hugging Face API before deploying
+
+Run this once locally to confirm your token + model ID are callable:
+
+```bash
+export HUGGINGFACEHUB_API_TOKEN=hf_xxx
+export HF_INFERENCE_API=mistralai/Mistral-7B-Instruct-v0.2
+python scripts/validate_hf_inference.py
+```
+
+If this fails, deployment will likely fail cloud mode too. Switch model or token first.
+
+---
+
+## 7) Local Smoke Test Before Deploy
 
 ```bash
 cp .env.example .env
@@ -124,7 +138,7 @@ Open: `http://localhost:7860`
 
 ---
 
-## 7) Security + Reliability Notes
+## 8) Security + Reliability Notes
 
 - Do **not** commit `.env` or tokens.
 - Keep secrets in host platform secret manager only.
@@ -134,7 +148,7 @@ Open: `http://localhost:7860`
 
 ---
 
-## 8) Suggested “Showcase” Setup (Free)
+## 9) Suggested “Showcase” Setup (Free)
 
 For portfolio/demo use:
 
