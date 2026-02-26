@@ -41,6 +41,8 @@ PDF_DATA_PATH     = os.getenv("PDF_DATA_PATH",     "data/")
 VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "vectorstore")
 EMBEDDING_MODEL   = os.getenv("EMBEDDING_MODEL",   "sentence-transformers/all-MiniLM-L6-v2")
 HF_INFERENCE_API  = os.getenv("HF_INFERENCE_API",  "mistralai/Mistral-7B-Instruct-v0.2")
+HF_API_TIMEOUT    = int(os.getenv("HF_API_TIMEOUT", "45"))
+HF_INFERENCE_TASK = os.getenv("HF_INFERENCE_TASK", "text-generation").strip() or "text-generation"
 LOCAL_LLM_PATH    = os.getenv("LOCAL_LLM_PATH",    "models/phi-2.Q4_K_M.gguf")
 RETRIEVER_K       = int(os.getenv("RETRIEVER_K",   "3"))
 
@@ -146,26 +148,37 @@ def _load_llm_internal():
     - gpu_info: Dict with GPU details for toast notification
     """
     hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN", "").strip()
+    cloud_error = None
 
     # ── 1. Cloud API ──────────────────────────────────────────────────────────
     if hf_token:
-        try:
-            llm = HuggingFaceEndpoint(
-                endpoint_url=f"https://router.huggingface.co/models/{HF_INFERENCE_API}",
-                huggingfacehub_api_token=hf_token,
-                temperature=0.3,
-                max_new_tokens=512,
-                timeout=30,
-            )
-            llm.invoke("hi")   # quick connectivity check
-            return llm, "cloud", None, None
-        except Exception as e:
-            # Return info for warning, continue to local model
-            cloud_error = f"Cloud API unavailable ({type(e).__name__})"
-            # Don't return yet, try local model
+        preferred_tasks = [HF_INFERENCE_TASK]
+        if HF_INFERENCE_TASK != "conversational":
+            preferred_tasks.append("conversational")
+
+        for task_name in preferred_tasks:
+            try:
+                llm = HuggingFaceEndpoint(
+                    repo_id=HF_INFERENCE_API,
+                    task=task_name,
+                    huggingfacehub_api_token=hf_token,
+                    temperature=0.3,
+                    max_new_tokens=512,
+                    timeout=HF_API_TIMEOUT,
+                )
+                llm.invoke("hi")   # quick connectivity check
+                return llm, "cloud", None, None
+            except Exception as e:
+                cloud_error = f"Cloud API unavailable ({type(e).__name__}) using task={task_name}"
 
     # ── 2. Local GGUF (GPU-accelerated) ──────────────────────────────────────
     if not os.path.exists(LOCAL_LLM_PATH):
+        cloud_hint = (
+            f"\n\nCloud attempt detail: {cloud_error}. "
+            "Check your Hugging Face token and verify `HF_INFERENCE_API` points to a model "
+            "available for Inference API/serverless calls."
+            if cloud_error else ""
+        )
         error_msg = (
             f"Local model not found at `{LOCAL_LLM_PATH}`.\n\n"
             "**Quick fix:** Download a GGUF model and update `LOCAL_LLM_PATH` in your `.env`.\n\n"
@@ -173,6 +186,7 @@ def _load_llm_internal():
             "- `phi-2.Q4_K_M.gguf` — best quality/speed balance (~1.7 GB)\n"
             "- `tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf` — fastest (~0.7 GB)\n\n"
             "See `WIFI_SETUP_GUIDE.md` for download links."
+            + cloud_hint
         )
         return None, None, error_msg, None
 
