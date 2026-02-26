@@ -68,22 +68,6 @@ def main() -> int:
 
     fail(
         "Inference call failed for all configured model/task combinations. This usually means the token is invalid, "
-    errors = []
-
-    for candidate in candidates:
-        print(f"🔎 Checking model callability: {candidate}")
-        client = InferenceClient(model=candidate, token=token, timeout=timeout)
-
-        try:
-            output = client.text_generation(prompt, max_new_tokens=8, temperature=0.0)
-            print(f"✅ Inference succeeded with {candidate}. Sample output: {output!r}")
-            print("✅ Hugging Face token + model combination appears callable.")
-            return 0
-        except Exception as exc:
-            errors.append(f"{candidate}: {type(exc).__name__}: {exc}")
-
-    fail(
-        "Inference call failed for all configured models. This usually means the token is invalid, "
         "the model is not available for your account/provider, or rate limits are hit.\n"
         + "\n".join(errors),
         code=2,

@@ -132,13 +132,57 @@ h1 { color: #0f172a !important; }
 # Lazy imports (only pulled in when actually needed)
 # ─────────────────────────────────────────────────────────────────────────────
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_classic.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage
+
+from huggingface_hub import InferenceClient
+from langchain_core.language_models.llms import LLM
+
+
+class HFInferenceLLM(LLM):
+    """Minimal LangChain-compatible wrapper around huggingface_hub InferenceClient."""
+
+    model_id: str
+    token: str
+    timeout: float
+    task: str = "conversational"
+    temperature: float = 0.3
+    max_new_tokens: int = 512
+
+    @property
+    def _llm_type(self) -> str:
+        return "hf-inference-client"
+
+    def _call(self, prompt: str, stop=None, run_manager=None, **kwargs) -> str:
+        client = InferenceClient(model=self.model_id, token=self.token, timeout=self.timeout)
+
+        if self.task == "conversational":
+            response = client.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=self.max_new_tokens,
+                temperature=self.temperature,
+            )
+            text = response.choices[0].message.content if response.choices else ""
+        else:
+            text = client.text_generation(
+                prompt,
+                max_new_tokens=self.max_new_tokens,
+                temperature=self.temperature,
+            )
+
+        if stop:
+            for token in stop:
+                if token and token in text:
+                    text = text.split(token)[0]
+                    break
+
+        return text
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LLM loader (no Streamlit UI calls inside cached function)
@@ -169,13 +213,13 @@ def _load_llm_internal():
         for model_id in candidate_models:
             for task_name in candidate_tasks:
                 try:
-                    llm = HuggingFaceEndpoint(
-                        repo_id=model_id,
+                    llm = HFInferenceLLM(
+                        model_id=model_id,
+                        token=hf_token,
+                        timeout=HF_API_TIMEOUT,
                         task=task_name,
-                        huggingfacehub_api_token=hf_token,
                         temperature=0.3,
                         max_new_tokens=512,
-                        timeout=HF_API_TIMEOUT,
                     )
                     llm.invoke("Reply with exactly: ok")  # quick connectivity check
                     if model_id == HF_INFERENCE_API and task_name == HF_INFERENCE_TASK:
@@ -185,23 +229,6 @@ def _load_llm_internal():
                     return llm, mode, None, None
                 except Exception as e:
                     cloud_errors.append(f"{model_id}|{task_name}: {type(e).__name__}")
-        cloud_errors = []
-
-        for model_id in candidate_models:
-            try:
-                llm = HuggingFaceEndpoint(
-                    repo_id=model_id,
-                    task="text-generation",
-                    huggingfacehub_api_token=hf_token,
-                    temperature=0.3,
-                    max_new_tokens=512,
-                    timeout=HF_API_TIMEOUT,
-                )
-                llm.invoke("Reply with exactly: ok")  # quick connectivity check
-                mode = "cloud" if model_id == HF_INFERENCE_API else f"cloud-fallback({model_id})"
-                return llm, mode, None, None
-            except Exception as e:
-                cloud_errors.append(f"{model_id}: {type(e).__name__}")
 
         cloud_error = f"Cloud API unavailable ({'; '.join(cloud_errors)})"
 
@@ -478,8 +505,6 @@ def _llm_mode_label(source: str) -> str:
         value = source[len("cloud-fallback("):-1]
         model, task = value.split("|", 1) if "|" in value else (value, "unknown-task")
         return f"☁️ Cloud fallback ({model}, {task})"
-        model = source[len("cloud-fallback("):-1]
-        return f"☁️ Cloud fallback ({model})"
     if source.startswith("local-gpu"):
         layers = source.split("(")[1].rstrip("L)") if "(" in source else "?"
         return f"🚀 Local GPU ({layers} layers offloaded)"
