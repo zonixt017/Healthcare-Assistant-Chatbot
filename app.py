@@ -42,10 +42,14 @@ VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "vectorstore")
 EMBEDDING_MODEL   = os.getenv("EMBEDDING_MODEL",   "sentence-transformers/all-MiniLM-L6-v2")
 HF_INFERENCE_API  = os.getenv("HF_INFERENCE_API",  "mistralai/Mistral-7B-Instruct-v0.2")
 HF_API_TIMEOUT    = int(os.getenv("HF_API_TIMEOUT", "45"))
+HF_INFERENCE_TASK  = os.getenv("HF_INFERENCE_TASK", "conversational").strip() or "conversational"
 LOCAL_LLM_PATH    = os.getenv("LOCAL_LLM_PATH",    "models/phi-2.Q4_K_M.gguf")
 RETRIEVER_K       = int(os.getenv("RETRIEVER_K",   "3"))
 HF_INFERENCE_FALLBACKS = [
     model.strip() for model in os.getenv("HF_INFERENCE_FALLBACKS", "").split(",") if model.strip()
+]
+HF_INFERENCE_TASK_FALLBACKS = [
+    task.strip() for task in os.getenv("HF_INFERENCE_TASK_FALLBACKS", "text-generation,conversational").split(",") if task.strip()
 ]
 
 # GPU layers: how many transformer layers to offload to GPU.
@@ -159,6 +163,28 @@ def _load_llm_internal():
     # ── 1. Cloud API ──────────────────────────────────────────────────────────
     if hf_token:
         candidate_models = [HF_INFERENCE_API, *HF_INFERENCE_FALLBACKS]
+        candidate_tasks = [HF_INFERENCE_TASK, *[t for t in HF_INFERENCE_TASK_FALLBACKS if t != HF_INFERENCE_TASK]]
+        cloud_errors = []
+
+        for model_id in candidate_models:
+            for task_name in candidate_tasks:
+                try:
+                    llm = HuggingFaceEndpoint(
+                        repo_id=model_id,
+                        task=task_name,
+                        huggingfacehub_api_token=hf_token,
+                        temperature=0.3,
+                        max_new_tokens=512,
+                        timeout=HF_API_TIMEOUT,
+                    )
+                    llm.invoke("Reply with exactly: ok")  # quick connectivity check
+                    if model_id == HF_INFERENCE_API and task_name == HF_INFERENCE_TASK:
+                        mode = "cloud"
+                    else:
+                        mode = f"cloud-fallback({model_id}|{task_name})"
+                    return llm, mode, None, None
+                except Exception as e:
+                    cloud_errors.append(f"{model_id}|{task_name}: {type(e).__name__}")
         cloud_errors = []
 
         for model_id in candidate_models:
@@ -449,6 +475,9 @@ def _llm_mode_label(source: str) -> str:
     if source == "cloud":
         return "☁️ Cloud (HuggingFace)"
     if source.startswith("cloud-fallback("):
+        value = source[len("cloud-fallback("):-1]
+        model, task = value.split("|", 1) if "|" in value else (value, "unknown-task")
+        return f"☁️ Cloud fallback ({model}, {task})"
         model = source[len("cloud-fallback("):-1]
         return f"☁️ Cloud fallback ({model})"
     if source.startswith("local-gpu"):
