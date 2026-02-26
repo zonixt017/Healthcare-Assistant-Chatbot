@@ -42,8 +42,15 @@ VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "vectorstore")
 EMBEDDING_MODEL   = os.getenv("EMBEDDING_MODEL",   "sentence-transformers/all-MiniLM-L6-v2")
 HF_INFERENCE_API  = os.getenv("HF_INFERENCE_API",  "mistralai/Mistral-7B-Instruct-v0.2")
 HF_API_TIMEOUT    = int(os.getenv("HF_API_TIMEOUT", "45"))
+HF_INFERENCE_TASK  = os.getenv("HF_INFERENCE_TASK", "conversational").strip() or "conversational"
 LOCAL_LLM_PATH    = os.getenv("LOCAL_LLM_PATH",    "models/phi-2.Q4_K_M.gguf")
 RETRIEVER_K       = int(os.getenv("RETRIEVER_K",   "3"))
+HF_INFERENCE_FALLBACKS = [
+    model.strip() for model in os.getenv("HF_INFERENCE_FALLBACKS", "").split(",") if model.strip()
+]
+HF_INFERENCE_TASK_FALLBACKS = [
+    task.strip() for task in os.getenv("HF_INFERENCE_TASK_FALLBACKS", "text-generation,conversational").split(",") if task.strip()
+]
 
 # GPU layers: how many transformer layers to offload to GPU.
 # For GTX 1650 4 GB with Phi-2 Q4_K_M (~1.7 GB) → all 32 layers fit.
@@ -125,13 +132,57 @@ h1 { color: #0f172a !important; }
 # Lazy imports (only pulled in when actually needed)
 # ─────────────────────────────────────────────────────────────────────────────
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpoint
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_classic.chains import create_history_aware_retriever, create_retrieval_chain
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage
+
+from huggingface_hub import InferenceClient
+from langchain_core.language_models.llms import LLM
+
+
+class HFInferenceLLM(LLM):
+    """Minimal LangChain-compatible wrapper around huggingface_hub InferenceClient."""
+
+    model_id: str
+    token: str
+    timeout: float
+    task: str = "conversational"
+    temperature: float = 0.3
+    max_new_tokens: int = 512
+
+    @property
+    def _llm_type(self) -> str:
+        return "hf-inference-client"
+
+    def _call(self, prompt: str, stop=None, run_manager=None, **kwargs) -> str:
+        client = InferenceClient(model=self.model_id, token=self.token, timeout=self.timeout)
+
+        if self.task == "conversational":
+            response = client.chat_completion(
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=self.max_new_tokens,
+                temperature=self.temperature,
+            )
+            text = response.choices[0].message.content if response.choices else ""
+        else:
+            text = client.text_generation(
+                prompt,
+                max_new_tokens=self.max_new_tokens,
+                temperature=self.temperature,
+            )
+
+        if stop:
+            for token in stop:
+                if token and token in text:
+                    text = text.split(token)[0]
+                    break
+
+        return text
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LLM loader (no Streamlit UI calls inside cached function)
@@ -146,26 +197,40 @@ def _load_llm_internal():
     - error_message: Error string if failed, None otherwise
     - gpu_info: Dict with GPU details for toast notification
     """
-    hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN", "").strip()
+    hf_token = (
+        os.getenv("HUGGINGFACEHUB_API_TOKEN", "").strip()
+        or os.getenv("HF_TOKEN", "").strip()
+        or os.getenv("HUGGINGFACE_API_TOKEN", "").strip()
+    )
     cloud_error = None
 
     # ── 1. Cloud API ──────────────────────────────────────────────────────────
     if hf_token:
-        try:
-            llm = HuggingFaceEndpoint(
-                repo_id=HF_INFERENCE_API,
-                task="text-generation",
-                huggingfacehub_api_token=hf_token,
-                temperature=0.3,
-                max_new_tokens=512,
-                timeout=HF_API_TIMEOUT,
-            )
-            llm.invoke("hi")   # quick connectivity check
-            return llm, "cloud", None, None
-        except Exception as e:
-            # Return info for warning, continue to local model
-            cloud_error = f"Cloud API unavailable ({type(e).__name__})"
-            # Don't return yet, try local model
+        candidate_models = [HF_INFERENCE_API, *HF_INFERENCE_FALLBACKS]
+        candidate_tasks = [HF_INFERENCE_TASK, *[t for t in HF_INFERENCE_TASK_FALLBACKS if t != HF_INFERENCE_TASK]]
+        cloud_errors = []
+
+        for model_id in candidate_models:
+            for task_name in candidate_tasks:
+                try:
+                    llm = HFInferenceLLM(
+                        model_id=model_id,
+                        token=hf_token,
+                        timeout=HF_API_TIMEOUT,
+                        task=task_name,
+                        temperature=0.3,
+                        max_new_tokens=512,
+                    )
+                    llm.invoke("Reply with exactly: ok")  # quick connectivity check
+                    if model_id == HF_INFERENCE_API and task_name == HF_INFERENCE_TASK:
+                        mode = "cloud"
+                    else:
+                        mode = f"cloud-fallback({model_id}|{task_name})"
+                    return llm, mode, None, None
+                except Exception as e:
+                    cloud_errors.append(f"{model_id}|{task_name}: {type(e).__name__}")
+
+        cloud_error = f"Cloud API unavailable ({'; '.join(cloud_errors)})"
 
     # ── 2. Local GGUF (GPU-accelerated) ──────────────────────────────────────
     if not os.path.exists(LOCAL_LLM_PATH):
@@ -181,7 +246,11 @@ def _load_llm_internal():
             "Recommended for your GTX 1650 (4 GB VRAM):\n"
             "- `phi-2.Q4_K_M.gguf` — best quality/speed balance (~1.7 GB)\n"
             "- `tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf` — fastest (~0.7 GB)\n\n"
-            "See `WIFI_SETUP_GUIDE.md` for download links."
+            "See `WIFI_SETUP_GUIDE.md` for download links.\n\n"
+            "Tip: on Hugging Face Spaces, add one of these secrets:\n"
+            "- `HUGGINGFACEHUB_API_TOKEN` (preferred)\n"
+            "- `HF_TOKEN`\n"
+            "- `HUGGINGFACE_API_TOKEN`"
             + cloud_hint
         )
         return None, None, error_msg, None
@@ -432,6 +501,10 @@ def _build_lc_history(messages: list) -> list:
 def _llm_mode_label(source: str) -> str:
     if source == "cloud":
         return "☁️ Cloud (HuggingFace)"
+    if source.startswith("cloud-fallback("):
+        value = source[len("cloud-fallback("):-1]
+        model, task = value.split("|", 1) if "|" in value else (value, "unknown-task")
+        return f"☁️ Cloud fallback ({model}, {task})"
     if source.startswith("local-gpu"):
         layers = source.split("(")[1].rstrip("L)") if "(" in source else "?"
         return f"🚀 Local GPU ({layers} layers offloaded)"
