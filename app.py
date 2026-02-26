@@ -170,6 +170,21 @@ def _load_llm_internal():
                 return llm, "cloud", None, None
             except Exception as e:
                 cloud_error = f"Cloud API unavailable ({type(e).__name__}) using task={task_name}"
+        try:
+            llm = HuggingFaceEndpoint(
+                repo_id=HF_INFERENCE_API,
+                task="text-generation",
+                huggingfacehub_api_token=hf_token,
+                temperature=0.3,
+                max_new_tokens=512,
+                timeout=HF_API_TIMEOUT,
+            )
+            llm.invoke("hi")   # quick connectivity check
+            return llm, "cloud", None, None
+        except Exception as e:
+            # Return info for warning, continue to local model
+            cloud_error = f"Cloud API unavailable ({type(e).__name__})"
+            # Don't return yet, try local model
 
     # ── 2. Local GGUF (GPU-accelerated) ──────────────────────────────────────
     if not os.path.exists(LOCAL_LLM_PATH):

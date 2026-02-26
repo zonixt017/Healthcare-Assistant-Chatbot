@@ -87,7 +87,6 @@ Minimum for public deployment:
 HUGGINGFACEHUB_API_TOKEN=hf_xxx
 HF_INFERENCE_API=mistralai/Mistral-7B-Instruct-v0.2
 HF_API_TIMEOUT=45
-HF_INFERENCE_TASK=text-generation
 PDF_DATA_PATH=data/
 VECTOR_STORE_PATH=vectorstore
 EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
@@ -114,7 +113,7 @@ export HF_INFERENCE_API=mistralai/Mistral-7B-Instruct-v0.2
 python scripts/validate_hf_inference.py
 ```
 
-If this fails, deployment will likely fail cloud mode too. The validator tries both text-generation and conversational modes; if both fail, switch model/token/provider.
+If this fails, deployment will likely fail cloud mode too. Switch model or token first.
 
 ---
 

@@ -165,7 +165,6 @@ All settings in `.env`:
 | `HUGGINGFACEHUB_API_TOKEN` | *(none)* | HF token for cloud inference |
 | `HF_INFERENCE_API` | `mistralai/Mistral-7B-Instruct-v0.2` | Cloud model ID |
 | `HF_API_TIMEOUT` | `45` | Cloud inference request timeout (seconds) |
-| `HF_INFERENCE_TASK` | `text-generation` | Preferred HF task; app retries `conversational` automatically |
 | `LOCAL_LLM_PATH` | `models/phi-2.Q4_K_M.gguf` | Local GGUF model path |
 | `N_GPU_LAYERS` | `32` | GPU layers to offload (0 = CPU) |
 | `PDF_DATA_PATH` | `data/` | PDF directory |
@@ -209,7 +208,7 @@ export HF_INFERENCE_API=mistralai/Mistral-7B-Instruct-v0.2
 python scripts/validate_hf_inference.py
 ```
 
-If this command fails, fix token/model availability first. The validator now tries both text-generation and conversational providers.
+If this command fails, fix token/model availability first; deployment will otherwise fall back to local GGUF (if present) or fail startup.
 
 ### Docker run (local or cloud VM)
 

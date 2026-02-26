@@ -60,6 +60,18 @@ def main() -> int:
             f"conversational error: {type(chat_exc).__name__}: {chat_exc}",
             code=2,
         )
+    try:
+        output = client.text_generation(prompt, max_new_tokens=8, temperature=0.0)
+    except Exception as exc:
+        fail(
+            "Inference call failed. This usually means the token is invalid, the model is not "
+            "available for your account/provider, or rate limits are hit.\n"
+            f"Error: {type(exc).__name__}: {exc}",
+            code=2,
+        )
+
+    print(f"✅ Inference succeeded. Sample output: {output!r}")
+    print("✅ Hugging Face token + model combination appears callable.")
     return 0
 
 
