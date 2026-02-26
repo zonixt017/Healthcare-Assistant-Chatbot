@@ -162,8 +162,9 @@ All settings in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HUGGINGFACEHUB_API_TOKEN` | *(none)* | HF token for cloud inference |
-| `HF_INFERENCE_API` | `mistralai/Mistral-7B-Instruct-v0.2` | Cloud model ID |
+| `HUGGINGFACEHUB_API_TOKEN` | *(none)* | Preferred HF token for cloud inference (also supports `HF_TOKEN` / `HUGGINGFACE_API_TOKEN`) |
+| `HF_INFERENCE_API` | `mistralai/Mistral-7B-Instruct-v0.2` | Primary cloud model ID |
+| `HF_INFERENCE_FALLBACKS` | *(empty)* | Comma-separated fallback model IDs (tried if primary fails) |
 | `HF_API_TIMEOUT` | `45` | Cloud inference request timeout (seconds) |
 | `LOCAL_LLM_PATH` | `models/phi-2.Q4_K_M.gguf` | Local GGUF model path |
 | `N_GPU_LAYERS` | `32` | GPU layers to offload (0 = CPU) |

@@ -8,7 +8,7 @@ This project is already structured for deployment with Docker and environment va
 
 Before deploying publicly, make sure you have the following:
 
-- [ ] `HUGGINGFACEHUB_API_TOKEN` set as a secret on your hosting platform.
+- [ ] `HUGGINGFACEHUB_API_TOKEN` (or `HF_TOKEN`) set as a secret on your hosting platform.
 - [ ] At least one PDF in `data/` for your knowledge base.
 - [ ] `vectorstore/` is **not** committed (it is generated automatically).
 - [ ] `models/` is **not** required in cloud deploy (cloud inference is recommended for free hosting).
@@ -86,6 +86,7 @@ Minimum for public deployment:
 ```env
 HUGGINGFACEHUB_API_TOKEN=hf_xxx
 HF_INFERENCE_API=mistralai/Mistral-7B-Instruct-v0.2
+HF_INFERENCE_FALLBACKS=meta-llama/Llama-3.1-8B-Instruct,Qwen/Qwen2.5-7B-Instruct
 HF_API_TIMEOUT=45
 PDF_DATA_PATH=data/
 VECTOR_STORE_PATH=vectorstore
@@ -110,6 +111,7 @@ Run this once locally to confirm your token + model ID are callable:
 ```bash
 export HUGGINGFACEHUB_API_TOKEN=hf_xxx
 export HF_INFERENCE_API=mistralai/Mistral-7B-Instruct-v0.2
+export HF_INFERENCE_FALLBACKS=meta-llama/Llama-3.1-8B-Instruct,Qwen/Qwen2.5-7B-Instruct
 python scripts/validate_hf_inference.py
 ```
 
