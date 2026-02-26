@@ -185,6 +185,23 @@ def _load_llm_internal():
                     return llm, mode, None, None
                 except Exception as e:
                     cloud_errors.append(f"{model_id}|{task_name}: {type(e).__name__}")
+        cloud_errors = []
+
+        for model_id in candidate_models:
+            try:
+                llm = HuggingFaceEndpoint(
+                    repo_id=model_id,
+                    task="text-generation",
+                    huggingfacehub_api_token=hf_token,
+                    temperature=0.3,
+                    max_new_tokens=512,
+                    timeout=HF_API_TIMEOUT,
+                )
+                llm.invoke("Reply with exactly: ok")  # quick connectivity check
+                mode = "cloud" if model_id == HF_INFERENCE_API else f"cloud-fallback({model_id})"
+                return llm, mode, None, None
+            except Exception as e:
+                cloud_errors.append(f"{model_id}: {type(e).__name__}")
 
         cloud_error = f"Cloud API unavailable ({'; '.join(cloud_errors)})"
 
@@ -461,6 +478,8 @@ def _llm_mode_label(source: str) -> str:
         value = source[len("cloud-fallback("):-1]
         model, task = value.split("|", 1) if "|" in value else (value, "unknown-task")
         return f"☁️ Cloud fallback ({model}, {task})"
+        model = source[len("cloud-fallback("):-1]
+        return f"☁️ Cloud fallback ({model})"
     if source.startswith("local-gpu"):
         layers = source.split("(")[1].rstrip("L)") if "(" in source else "?"
         return f"🚀 Local GPU ({layers} layers offloaded)"
